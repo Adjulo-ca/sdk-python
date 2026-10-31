@@ -20,6 +20,27 @@ from .resources.vibe import Vibe
 
 DEFAULT_BASE_URL = "https://api.adjulo.io"
 
+#: Langues acceptées par l'option ``language`` (en-tête ``Accept-Language``).
+SUPPORTED_LANGUAGES = ("fr", "en")
+
+
+def _normalize_language(value):
+    """Valide la langue demandée et la rend en minuscules (``None`` si absente).
+
+    L'API ne reconnaît que la valeur nue ``en`` ; toute autre valeur, ou
+    l'absence d'en-tête, donne du français. Le SDK refuse donc tout ce qui
+    n'est ni ``fr`` ni ``en`` plutôt que de laisser l'API retomber en silence
+    sur le français.
+    """
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized not in SUPPORTED_LANGUAGES:
+        raise AdjuloConfigError(
+            f"language invalide : {value!r} (valeurs admises : \"fr\" ou \"en\")"
+        )
+    return normalized
+
 
 class AdjuloClient:
     """Point d'entrée du SDK Adjulo.
@@ -32,8 +53,9 @@ class AdjuloClient:
     >>> for ao in page["items"]:
     ...     print(ao["titre"])
 
-    La clé API et l'URL de base peuvent aussi provenir de l'environnement
-    (``ADJULO_API_KEY`` et ``ADJULO_BASE_URL``).
+    La clé API, l'URL de base et la langue peuvent aussi provenir de
+    l'environnement (``ADJULO_API_KEY``, ``ADJULO_BASE_URL`` et
+    ``ADJULO_LANGUAGE``).
 
     Le client est utilisable comme gestionnaire de contexte pour fermer
     proprement la connexion HTTP ::
@@ -52,6 +74,14 @@ class AdjuloClient:
         Délai d'attente réseau, en secondes (défaut 30).
     max_retries : int
         Nombre de tentatives supplémentaires sur 429/5xx (défaut 2).
+    language : str, optionnel
+        Langue des réponses : ``"fr"`` ou ``"en"`` (insensible à la casse),
+        envoyée dans l'en-tête ``Accept-Language`` de chaque requête. En
+        anglais, l'API rend en anglais les messages d'erreur, le ``titre`` des
+        avis (titre traduit), les résumés (``resume_en``) et les libellés
+        UNSPSC ; les noms d'organismes et d'entreprises ne changent pas.
+        À défaut, lue depuis ``ADJULO_LANGUAGE`` ; sinon aucun en-tête n'est
+        envoyé et l'API répond en français.
     """
 
     def __init__(
@@ -63,6 +93,7 @@ class AdjuloClient:
         max_retries=2,
         http_client=None,
         transport=None,
+        language=None,
     ):
         self.api_key = api_key or os.getenv("ADJULO_API_KEY")
         self.base_url = (base_url or os.getenv("ADJULO_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
@@ -71,6 +102,9 @@ class AdjuloClient:
                 f"base_url invalide : {self.base_url!r} (doit commencer par http:// ou https://)"
             )
         self.max_retries = max(0, int(max_retries))
+        if language is None:
+            language = os.getenv("ADJULO_LANGUAGE") or None
+        self.language = _normalize_language(language)
 
         headers = {
             "User-Agent": f"adjulo-python/{__version__}",
@@ -78,6 +112,8 @@ class AdjuloClient:
         }
         if self.api_key:
             headers["X-API-Key"] = self.api_key
+        if self.language:
+            headers["Accept-Language"] = self.language
 
         self._client = http_client or httpx.Client(
             base_url=self.base_url, headers=headers, timeout=timeout, transport=transport

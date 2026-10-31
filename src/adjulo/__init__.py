@@ -9,7 +9,7 @@ Veille des marchés publics québécois (SEAO) et fédéraux (CanadaBuys).
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .client import AdjuloClient
 from .errors import (

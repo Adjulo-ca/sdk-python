@@ -110,3 +110,66 @@ def test_context_manager_ferme(make_client):
     with make_client(handler) as client:
         client.get("/v1/usage")
     assert client._client.is_closed
+
+
+# ── Langue (en-tête Accept-Language) ─────────────────────────────────────
+
+
+def _capturer_langue(make_client, **kwargs):
+    """Fait deux requêtes et renvoie l'en-tête Accept-Language vu à chacune."""
+    vus = []
+
+    def handler(request):
+        vus.append(request.headers.get("Accept-Language"))
+        return httpx.Response(200, json={"ok": True})
+
+    client = make_client(handler, **kwargs)
+    client.get("/v1/usage")
+    client.post("/v1/vibe/feedback", json={"ao_id": "x"})
+    return client, vus
+
+
+def test_langue_absente_par_defaut(make_client, monkeypatch):
+    monkeypatch.delenv("ADJULO_LANGUAGE", raising=False)
+    client, vus = _capturer_langue(make_client)
+    assert client.language is None
+    assert vus == [None, None]  # aucun en-tête : comportement de la v0.1.0
+
+
+@pytest.mark.parametrize("valeur", ["en", "EN", " En "])
+def test_langue_en_envoyee_sur_chaque_requete(make_client, monkeypatch, valeur):
+    monkeypatch.delenv("ADJULO_LANGUAGE", raising=False)
+    client, vus = _capturer_langue(make_client, language=valeur)
+    assert client.language == "en"
+    assert vus == ["en", "en"]
+
+
+def test_langue_fr_envoyee(make_client, monkeypatch):
+    monkeypatch.delenv("ADJULO_LANGUAGE", raising=False)
+    _, vus = _capturer_langue(make_client, language="FR")
+    assert vus == ["fr", "fr"]
+
+
+@pytest.mark.parametrize("valeur", ["de", "en-US", "english", ""])
+def test_langue_invalide_refusee(valeur):
+    with pytest.raises(AdjuloConfigError, match="language invalide"):
+        AdjuloClient(api_key="adj_x", base_url="https://api.example.test", language=valeur)
+
+
+def test_langue_depuis_environnement(make_client, monkeypatch):
+    monkeypatch.setenv("ADJULO_LANGUAGE", "en")
+    client, vus = _capturer_langue(make_client)
+    assert client.language == "en"
+    assert vus == ["en", "en"]
+
+
+def test_langue_parametre_prime_sur_environnement(make_client, monkeypatch):
+    monkeypatch.setenv("ADJULO_LANGUAGE", "en")
+    _, vus = _capturer_langue(make_client, language="fr")
+    assert vus == ["fr", "fr"]
+
+
+def test_langue_environnement_invalide_refusee(monkeypatch):
+    monkeypatch.setenv("ADJULO_LANGUAGE", "es")
+    with pytest.raises(AdjuloConfigError, match="language invalide"):
+        AdjuloClient(api_key="adj_x", base_url="https://api.example.test")

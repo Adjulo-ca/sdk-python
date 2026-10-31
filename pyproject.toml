@@ -1,6 +1,6 @@
 [project]
 name = "adjulo"
-version = "0.1.0"
+version = "0.2.0"
 description = "SDK Python officiel de l'API Adjulo — veille des marchés publics québécois et fédéraux (SEAO + CanadaBuys)."
 readme = "README.md"
 requires-python = ">=3.10"

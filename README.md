@@ -59,6 +59,7 @@ La clé API et l'URL de base peuvent provenir de l'environnement :
 ```bash
 export ADJULO_API_KEY="adj_votre_cle"
 export ADJULO_BASE_URL="https://api.adjulo.io"   # défaut
+export ADJULO_LANGUAGE="en"                       # optionnel : fr (défaut) ou en
 ```
 
 Le client est aussi un gestionnaire de contexte :
@@ -67,6 +68,28 @@ Le client est aussi un gestionnaire de contexte :
 with AdjuloClient() as client:
     print(client.public.version())
 ```
+
+---
+
+## Langue / Language
+
+Par défaut, l'API répond en français. L'option `language` demande l'anglais :
+le SDK envoie alors l'en-tête `Accept-Language` sur chaque requête.
+
+```python
+client = AdjuloClient(api_key="adj_votre_cle", language="en")   # ou via ADJULO_LANGUAGE=en
+
+ao = client.appels_offres.get("SEAO-123456")
+print(ao["titre"])   # titre traduit en anglais
+```
+
+En anglais, l'API rend en anglais les messages d'erreur, le `titre` des avis
+(titre traduit), les résumés (`resume_en`) et les libellés UNSPSC. Les noms
+d'organismes et d'entreprises ne changent pas.
+
+Valeurs admises : `"fr"` ou `"en"` (insensible à la casse) ; toute autre valeur
+lève `AdjuloConfigError`. Sans option ni variable d'environnement, aucun en-tête
+n'est envoyé (français).
 
 ---
 
